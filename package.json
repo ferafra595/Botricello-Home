@@ -1,0 +1,14 @@
+{
+  "name": "botricello-home",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler pages dev public",
+    "deploy": "wrangler pages deploy public --project-name botricello-home",
+    "db:local": "wrangler d1 execute botricello-home --local --file=./schema.sql",
+    "db:remote": "wrangler d1 execute botricello-home --remote --file=./schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

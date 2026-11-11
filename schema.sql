@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS rates (month INTEGER PRIMARY KEY, price INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS overrides (id TEXT PRIMARY KEY, start_date TEXT NOT NULL, end_date TEXT NOT NULL, price INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS discounts (id TEXT PRIMARY KEY, min_nights INTEGER NOT NULL, pct INTEGER NOT NULL, active INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS requests (id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL, email TEXT, start_date TEXT NOT NULL, end_date TEXT NOT NULL, guests INTEGER NOT NULL, nights INTEGER NOT NULL, price INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS blocks (id TEXT PRIMARY KEY, start_date TEXT NOT NULL, end_date TEXT NOT NULL, description TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS login_attempts (id TEXT PRIMARY KEY, count INTEGER NOT NULL, reset_at INTEGER NOT NULL);
+INSERT OR IGNORE INTO rates(month,price) VALUES (1,55),(2,55),(3,60),(4,65),(5,70),(6,85),(7,110),(8,130),(9,85),(10,65),(11,55),(12,65);
+INSERT OR IGNORE INTO discounts(id,min_nights,pct,active) VALUES ('week',14,10,1),('month',30,20,1);
+INSERT OR IGNORE INTO settings(key,value) VALUES ('site', '{"name":"Botricello Home","whatsapp":"393663416236","checkin":"15:00","checkout":"10:00","cleaningIncluded":true,"minNights":1,"heroTitleIt":"A pochi passi dal mare. Come a casa.","heroTitleEn":"Steps from the sea. Right at home.","descriptionIt":"Una casa a schiera su due livelli, con giardino e ingresso indipendente a Botricello, sulla costa ionica calabrese.","descriptionEn":"A two-level townhouse with a garden and private entrance in Botricello, on Calabria’s Ionian coast."}');
+CREATE TABLE IF NOT EXISTS reserved_nights (day TEXT PRIMARY KEY, request_id TEXT NOT NULL);
