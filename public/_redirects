@@ -1,1 +1,1 @@
-/admin /admin.html 200
+# Nessun redirect personalizzato: Cloudflare Pages gestisce automaticamente /admin e /admin.html.
