@@ -2,7 +2,7 @@ const $=s=>document.querySelector(s);let state=null;const months=['Gennaio','Feb
 async function api(path,data){const res=await fetch('/api/'+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{});let body=await res.json();if(!res.ok)throw Error(body.error||'Errore API');return body}
 function status(msg,err=false){$('#feedback').textContent=msg;$('#feedback').style.color=err?'#a34838':'#27734f';if(msg)window.scrollTo({top:0,behavior:'smooth'})}
 async function save(path,data){try{await api(path,data);await refresh();status('Modifica salvata')}catch(e){status(e.message,true)}}
-async function refresh(){state=await api('admin');render()}
+async function refresh(){try{state=await api('admin');renderCal();render()}catch(err){console.error('Admin:',err);status('Errore caricamento dati: '+err.message,true);renderCal();}}
 async function start(){try{const s=await api('session');if(s.loggedIn){$('#login').classList.add('hide');$('#app').classList.remove('hide');await refresh()}}catch{}}
 $('#loginForm').onsubmit=async e=>{e.preventDefault();try{await api('login',{password:$('#password').value});$('#password').value='';$('#login').classList.add('hide');$('#app').classList.remove('hide');await refresh()}catch(err){$('#loginFeedback').textContent=err.message;$('#loginFeedback').style.color='#a34838'}};
 $('#logout').onclick=async()=>{try{await api('logout',{})}finally{window.location.reload()}};
@@ -15,14 +15,66 @@ function render(){if(!state)return;const pending=state.requests.filter(r=>r.stat
  $('#overridesList').innerHTML=state.overrides.map(o=>`<p>${esc(o.start_date)} → ${esc(o.end_date)} · <b>${euro(o.price)}/notte</b> <button class="smallbtn danger" data-del-override="${esc(o.id)}">Elimina</button></p>`).join('')||'<p class="muted">Nessun periodo speciale.</p>';document.querySelectorAll('[data-del-override]').forEach(b=>b.onclick=()=>{if(confirm('Eliminare questa tariffa speciale?'))save('overrides/delete',{id:b.dataset.delOverride})});
  $('#discountList').innerHTML=state.discounts.map(o=>`<p>Da <b>${o.min_nights} notti</b> · <b>${o.pct}%</b> <button class="smallbtn danger" data-del-discount="${esc(o.id)}">Elimina</button></p>`).join('')||'<p class="muted">Nessuno sconto.</p>';document.querySelectorAll('[data-del-discount]').forEach(b=>b.onclick=()=>{if(confirm('Eliminare lo sconto?'))save('discounts/delete',{id:b.dataset.delDiscount})});
  $('#blocksList').innerHTML=state.blocks.map(o=>`<p>${esc(o.start_date)} → ${esc(o.end_date)} · ${esc(o.description)} <button class="smallbtn danger" data-del-block="${esc(o.id)}">Sblocca</button></p>`).join('')||'<p class="muted">Nessuna data bloccata manualmente.</p>';document.querySelectorAll('[data-del-block]').forEach(b=>b.onclick=()=>{if(confirm('Rimuovere il blocco?'))save('blocks/delete',{id:b.dataset.delBlock})});
- const s=state.site;$('#cName').value=s.name||'';$('#cTitleIt').value=s.heroTitleIt||'';$('#cTitleEn').value=s.heroTitleEn||'';$('#cDescIt').value=s.descriptionIt||'';$('#cDescEn').value=s.descriptionEn||'';$('#cGallery').value=(s.gallery||[]).join('\n');$('#sWhatsapp').value=s.whatsapp||'';$('#sCheckin').value=s.checkin||'15:00';$('#sCheckout').value=s.checkout||'10:00';renderCal();renderAdvanced();}
+ const s=state.site;$('#cName').value=s.name||'';$('#cTitleIt').value=s.heroTitleIt||'';$('#cTitleEn').value=s.heroTitleEn||'';$('#cDescIt').value=s.descriptionIt||'';$('#cDescEn').value=s.descriptionEn||'';$('#cGallery').value=(s.gallery||[]).join('\n');$('#sWhatsapp').value=s.whatsapp||'';$('#sCheckin').value=s.checkin||'15:00';$('#sCheckout').value=s.checkout||'10:00';renderAdvanced();}
 $('#overrideForm').onsubmit=e=>{e.preventDefault();save('overrides',{start:$('#overrideStart').value,end:$('#overrideEnd').value,price:+$('#overridePrice').value})};
 $('#discountForm').onsubmit=e=>{e.preventDefault();save('discounts',{min_nights:+$('#minNights').value,pct:+$('#pct').value})};
 $('#blockForm').onsubmit=e=>{e.preventDefault();save('blocks',{start:$('#blockStart').value,end:$('#blockEnd').value,description:$('#blockDesc').value})};
 $('#contentForm').onsubmit=e=>{e.preventDefault();save('settings',{name:$('#cName').value,heroTitleIt:$('#cTitleIt').value,heroTitleEn:$('#cTitleEn').value,descriptionIt:$('#cDescIt').value,descriptionEn:$('#cDescEn').value,gallery:$('#cGallery').value.split('\n').map(x=>x.trim()).filter(Boolean)})};
 $('#settingsForm').onsubmit=e=>{e.preventDefault();save('settings',{whatsapp:$('#sWhatsapp').value.replace(/\D/g,''),checkin:$('#sCheckin').value,checkout:$('#sCheckout').value})};
-let calSelectionStart=null;let calDate=new Date();calDate.setDate(1);$('#calPrev').onclick=()=>{calDate.setMonth(calDate.getMonth()-1);renderCal()};$('#calNext').onclick=()=>{calDate.setMonth(calDate.getMonth()+1);renderCal()};
-function renderCal(){if(!state)return;const year=calDate.getFullYear(),month=calDate.getMonth(),days=new Date(year,month+1,0).getDate();$('#calTitle').textContent=months[month]+' '+year;const mondayOffset=(new Date(year,month,1).getDay()+6)%7;let html=['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].map(d=>`<div class="weekday">${d}</div>`).join('');for(let i=0;i<mondayOffset;i++)html+='<div></div>';for(let d=1;d<=days;d++){const day=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const r=state.requests.find(r=>r.status==='confirmed'&&day>=r.start_date&&day<r.end_date);const b=state.blocks.find(b=>day>=b.start_date&&day<b.end_date);html+=`<button type="button" class="day ${r?'booked':b?'blocked':''}" data-cal-day="${day}" aria-label="${day}">${d}<div class="tiny">${r?esc(r.name):b?'Bloccato':''}</div></button>`}$('#calendarGrid').innerHTML=html;document.querySelectorAll('[data-cal-day]').forEach(btn=>btn.onclick=()=>{const day=btn.dataset.calDay;const r=state.requests.find(r=>r.status==='confirmed'&&day>=r.start_date&&day<r.end_date);if(r){calSelectionStart=null;openEdit(r)}else{const b=state.blocks.find(b=>day>=b.start_date&&day<b.end_date);if(b){calSelectionStart=null;if(confirm('Rimuovere il blocco: '+b.description+'?'))save('blocks/delete',{id:b.id})}else{let from=day,to=day;if(calSelectionStart){from=day<calSelectionStart?day:calSelectionStart;to=day>calSelectionStart?day:calSelectionStart;calSelectionStart=null}else calSelectionStart=day;$('#blockStart').value=from;const next=new Date(to+'T12:00:00Z');next.setUTCDate(next.getUTCDate()+1);$('#blockEnd').value=next.toISOString().slice(0,10);$('#calSelectionInfo').textContent=calSelectionStart?'Inizio selezionato: '+from+'. Seleziona la data finale, poi premi Blocca.':'Intervallo '+from+' — '+to+' selezionato. Premi Blocca per confermare.';$('#blockDesc').focus()}}})}
+// Calendario V3: panoramica mensile e settimanale, senza modifiche al database.
+let calSelectionStart=null;
+let calDate=new Date();calDate.setHours(12,0,0,0);calDate.setDate(1);
+let calMode='month';
+const pad2=n=>String(n).padStart(2,'0');
+const dayISO=d=>`${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+const parseDay=s=>new Date(s+'T12:00:00');
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
+const monday=d=>addDays(d,-((d.getDay()+6)%7));
+const prettyDay=s=>{const x=parseDay(s);return `${pad2(x.getDate())}/${pad2(x.getMonth()+1)}/${x.getFullYear()}`};
+const calBookings=()=>Array.isArray(state?.requests)?state.requests.filter(r=>r.status==='confirmed'):[];
+const calBlocks=()=>Array.isArray(state?.blocks)?state.blocks:[];
+function dayData(day){const booking=calBookings().find(r=>r.start_date<=day&&day<r.end_date);const block=calBlocks().find(b=>b.start_date<=day&&day<b.end_date);return {booking,block};}
+function changeCal(n){if(calMode==='week'){calDate=addDays(calDate,7*n)}else{const d=calDate.getDate();calDate.setDate(1);calDate.setMonth(calDate.getMonth()+n);calDate.setDate(Math.min(d,new Date(calDate.getFullYear(),calDate.getMonth()+1,0).getDate()))}renderCal()}
+$('#calPrev').onclick=()=>changeCal(-1);
+$('#calNext').onclick=()=>changeCal(1);
+$('#calToday').onclick=()=>{calDate=new Date();calDate.setHours(12,0,0,0);renderCal()};
+document.querySelectorAll('[data-cal-mode]').forEach(b=>b.onclick=()=>{calMode=b.dataset.calMode;calSelectionStart=null;renderCal()});
+function selectCalDay(day){if(!state){status('Dati non caricati: controlla il collegamento con D1.',true);return}
+ const {booking,block}=dayData(day);
+ if(booking){calSelectionStart=null;openEdit(booking);return}
+ if(block){calSelectionStart=null;if(confirm(`Vuoi rimuovere il blocco dal ${prettyDay(block.start_date)} al ${prettyDay(block.end_date)} (partenza)?`))save('blocks/delete',{id:block.id});return}
+ let from=day,to=day;
+ if(calSelectionStart){from=day<calSelectionStart?day:calSelectionStart;to=day>calSelectionStart?day:calSelectionStart;calSelectionStart=null}
+ else calSelectionStart=day;
+ $('#blockStart').value=from;
+ $('#blockEnd').value=dayISO(addDays(parseDay(to),1));
+ $('#calSelectionInfo').textContent=calSelectionStart?'Prima data selezionata: '+prettyDay(day)+'. Seleziona la data finale per estendere il blocco, oppure usa il modulo.':'Periodo selezionato: '+prettyDay(from)+' – '+prettyDay(to)+'. Premi Blocca per confermare.';
+ $('#blockForm').scrollIntoView({behavior:'smooth',block:'nearest'});
+ renderCal();
+}
+function dayMarkup(day,inCurrent=true){const {booking,block}=dayData(day);const d=parseDay(day);const title=booking?`${booking.name||'Ospite'} · ${booking.start_date} → ${booking.end_date}`:block?`Blocco: ${block.description||'Non disponibile'}`:'Disponibile';const today=day===dayISO(new Date());const selected=calSelectionStart===day;return `<button type="button" class="cal-day ${inCurrent?'':'other-month'} ${booking?'is-booked':block?'is-blocked':'is-free'} ${today?'is-today':''} ${selected?'is-selected':''}" data-cal-day="${day}" aria-label="${esc(prettyDay(day)+' – '+title)}" title="${esc(title)}"><span class="cal-day-top"><strong>${d.getDate()}</strong>${today?'<span class="cal-today-dot" aria-label="Oggi"></span>':''}</span><span class="cal-day-content">${booking?'<span class="cal-tag booked">'+esc(booking.name||'Prenotato')+'</span>':block?'<span class="cal-tag blocked">'+esc(block.description||'Bloccato')+'</span>':'<span class="cal-free">Libero</span>'}</span></button>`}
+function renderCal(){
+ const head=$('#calTitle'),grid=$('#calendarGrid');if(!head||!grid)return;
+ document.querySelectorAll('[data-cal-mode]').forEach(b=>{const active=b.dataset.calMode===calMode;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active))});
+ const year=calDate.getFullYear(),month=calDate.getMonth();
+ const from=calMode==='week'?monday(calDate):monday(new Date(year,month,1,12));
+ const total=calMode==='week'?7:Math.ceil(((new Date(year,month+1,0).getDate())+(new Date(year,month,1).getDay()+6)%7)/7)*7;
+ const last=addDays(from,total-1);
+ head.textContent=calMode==='week'?`${prettyDay(dayISO(from))} – ${prettyDay(dayISO(last))}`:`${months[month]} ${year}`;
+ const span=Array.from({length:total},(_,i)=>dayISO(addDays(from,i)));
+ const bookedCount=span.filter(d=>dayData(d).booking&& (calMode==='week'||parseDay(d).getMonth()===month)).length;
+ const blockedCount=span.filter(d=>dayData(d).block&&!dayData(d).booking&& (calMode==='week'||parseDay(d).getMonth()===month)).length;
+ const daysInScope=calMode==='week'?7:new Date(year,month+1,0).getDate();
+ $('#calMetrics').innerHTML=`<div><strong>${bookedCount}</strong><span>Notti prenotate</span></div><div><strong>${blockedCount}</strong><span>Notti bloccate</span></div><div><strong>${Math.max(0,daysInScope-bookedCount-blockedCount)}</strong><span>Notti libere</span></div>`;
+ grid.className='calendar cal-overview '+(calMode==='week'?'cal-week':'cal-month');
+ grid.innerHTML=['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].map(d=>`<div class="cal-weekday">${d}</div>`).join('')+span.map(d=>dayMarkup(d,calMode==='week'||parseDay(d).getMonth()===month)).join('');
+ grid.querySelectorAll('[data-cal-day]').forEach(el=>el.addEventListener('click',()=>selectCalDay(el.dataset.calDay)));
+ const activeBookings=calBookings().filter(r=>r.start_date<dayISO(addDays(last,1))&&r.end_date>dayISO(from));
+ const list=$('#calBookingList');if(list)list.innerHTML=activeBookings.length?activeBookings.sort((a,b)=>a.start_date.localeCompare(b.start_date)).map(r=>`<button type="button" class="cal-booking-row" data-cal-booking="${esc(r.id)}"><span class="cal-booking-dot"></span><span><b>${esc(r.name)}</b><small>${prettyDay(r.start_date)} – ${prettyDay(r.end_date)} · ${esc(r.guests)} ospiti</small></span><strong>${euro(r.price)}</strong></button>`).join(''):'<p class="muted">Nessuna prenotazione confermata in questo periodo.</p>';
+ list?.querySelectorAll('[data-cal-booking]').forEach(b=>b.addEventListener('click',()=>{const r=calBookings().find(x=>String(x.id)===b.dataset.calBooking);if(r)openEdit(r)}));
+}
+renderCal();
+
 start();
 
 // Botricello Home V2 — amministrazione avanzata
